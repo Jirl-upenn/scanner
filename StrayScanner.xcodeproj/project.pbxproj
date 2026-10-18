@@ -48,6 +48,12 @@
 		38694C7926D2C66F00546EA1 /* VideoEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38694C6E26D2C66F00546EA1 /* VideoEncoder.swift */; };
 		38694C7A26D2C66F00546EA1 /* IMUEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38694C6F26D2C66F00546EA1 /* IMUEncoder.swift */; };
 		38694C7B26D2C66F00546EA1 /* IMUEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38694C6F26D2C66F00546EA1 /* IMUEncoder.swift */; };
+		FA6E11E9BFB452EE95C723F8 /* EventEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9428FD0AB0D489B1F5369097 /* EventEncoder.swift */; };
+		276185C462DC0589B822DF22 /* EventEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9428FD0AB0D489B1F5369097 /* EventEncoder.swift */; };
+		3412B4BB13015BF945FC0D47 /* PoseEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFCA86AB71B4A279A133A62D /* PoseEncoder.swift */; };
+		4442896AFA6CAC11E82DAA14 /* PoseEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFCA86AB71B4A279A133A62D /* PoseEncoder.swift */; };
+		2D503BFC53F930C695A3558F /* ClockEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55011CEC132F7F48DEDBC81 /* ClockEncoder.swift */; };
+		61AC66F1D5651DB8BF331BF2 /* ClockEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = D55011CEC132F7F48DEDBC81 /* ClockEncoder.swift */; };
 		38694C7C26D2C66F00546EA1 /* CameraRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38694C7026D2C66F00546EA1 /* CameraRenderer.swift */; };
 		38694C7D26D2C66F00546EA1 /* CameraRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38694C7026D2C66F00546EA1 /* CameraRenderer.swift */; };
 		38694C7E26D2C66F00546EA1 /* OdometryEncoder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38694C7126D2C66F00546EA1 /* OdometryEncoder.swift */; };
@@ -104,6 +110,9 @@
 		38694C6D26D2C66F00546EA1 /* ConfidenceEncoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ConfidenceEncoder.swift; sourceTree = "<group>"; };
 		38694C6E26D2C66F00546EA1 /* VideoEncoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = VideoEncoder.swift; sourceTree = "<group>"; };
 		38694C6F26D2C66F00546EA1 /* IMUEncoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = IMUEncoder.swift; sourceTree = "<group>"; };
+		9428FD0AB0D489B1F5369097 /* EventEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventEncoder.swift; sourceTree = "<group>"; };
+		FFCA86AB71B4A279A133A62D /* PoseEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PoseEncoder.swift; sourceTree = "<group>"; };
+		D55011CEC132F7F48DEDBC81 /* ClockEncoder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClockEncoder.swift; sourceTree = "<group>"; };
 		38694C7026D2C66F00546EA1 /* CameraRenderer.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = CameraRenderer.swift; sourceTree = "<group>"; };
 		38694C7126D2C66F00546EA1 /* OdometryEncoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = OdometryEncoder.swift; sourceTree = "<group>"; };
 		38694C7226D2C66F00546EA1 /* DepthEncoder.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DepthEncoder.swift; sourceTree = "<group>"; };
@@ -255,6 +264,9 @@
 				38694C6D26D2C66F00546EA1 /* ConfidenceEncoder.swift */,
 				38694C6E26D2C66F00546EA1 /* VideoEncoder.swift */,
 				38694C6F26D2C66F00546EA1 /* IMUEncoder.swift */,
+				9428FD0AB0D489B1F5369097 /* EventEncoder.swift */,
+				FFCA86AB71B4A279A133A62D /* PoseEncoder.swift */,
+				D55011CEC132F7F48DEDBC81 /* ClockEncoder.swift */,
 				38694C7026D2C66F00546EA1 /* CameraRenderer.swift */,
 				38694C7126D2C66F00546EA1 /* OdometryEncoder.swift */,
 				38694C7226D2C66F00546EA1 /* DepthEncoder.swift */,
@@ -512,6 +524,9 @@
 				3807420B27BBCE83003194C1 /* PngEncoder.mm in Sources */,
 				38694C7C26D2C66F00546EA1 /* CameraRenderer.swift in Sources */,
 				38694C7A26D2C66F00546EA1 /* IMUEncoder.swift in Sources */,
+				FA6E11E9BFB452EE95C723F8 /* EventEncoder.swift in Sources */,
+				3412B4BB13015BF945FC0D47 /* PoseEncoder.swift in Sources */,
+				2D503BFC53F930C695A3558F /* ClockEncoder.swift in Sources */,
 				38FB73162572AF63007D9CB0 /* Shaders.metal in Sources */,
 				385999BD25616F2B00F3F681 /* AppDelegate.swift in Sources */,
 				38C17B23259D1C80006B3FDA /* SessionDetail.swift in Sources */,
@@ -543,6 +558,9 @@
 				38694C7526D2C66F00546EA1 /* DatasetEncoder.swift in Sources */,
 				38694C7D26D2C66F00546EA1 /* CameraRenderer.swift in Sources */,
 				38694C7B26D2C66F00546EA1 /* IMUEncoder.swift in Sources */,
+				276185C462DC0589B822DF22 /* EventEncoder.swift in Sources */,
+				4442896AFA6CAC11E82DAA14 /* PoseEncoder.swift in Sources */,
+				61AC66F1D5651DB8BF331BF2 /* ClockEncoder.swift in Sources */,
 				3863FE6425FCBB0E00C1DA4F /* Shaders.metal in Sources */,
 				3863FE6525FCBB0E00C1DA4F /* AppDelegate.swift in Sources */,
 				3863FE6625FCBB0E00C1DA4F /* SessionDetail.swift in Sources */,

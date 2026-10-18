@@ -73,6 +73,9 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
         fpsButton.layer.cornerRadius = 12.0
         
         imuOperationQueue.qualityOfService = .userInitiated
+        // Accelerometer and gyroscope handlers share DatasetEncoder's IMU state and
+        // file; run them one at a time.
+        imuOperationQueue.maxConcurrentOperationCount = 1
     }
 
     override func viewDidDisappear(_ animated: Bool) {
@@ -96,6 +99,8 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
             unsupported = true
         } else {
             config.frameSemantics.insert(.sceneDepth)
+            // Plane anchors (with floor classification) are saved to planes.json.
+            config.planeDetection = .horizontal
             session.run(config)
         }
     }
@@ -177,7 +182,10 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
         updateLabelTimer = nil
         // Stop IMU updates
         stopRawIMU()
-        datasetEncoder?.wrapUp()
+        // Handlers already queued would otherwise write to the closed imu.csv.
+        imuOperationQueue.waitUntilAllOperationsAreFinished()
+        let planes = session.currentFrame?.anchors.compactMap { $0 as? ARPlaneAnchor } ?? []
+        datasetEncoder?.wrapUp(planes: planes)
         if let encoder = datasetEncoder {
             switch encoder.status {
                 case .allGood:
@@ -259,6 +267,18 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
                 print("There is no video encoder. That can't be good.")
             }
         }
+    }
+
+    func sessionWasInterrupted(_ session: ARSession) {
+        datasetEncoder?.addEvent("session_interrupted")
+    }
+
+    func sessionInterruptionEnded(_ session: ARSession) {
+        datasetEncoder?.addEvent("session_interruption_ended")
+    }
+
+    func session(_ session: ARSession, didFailWithError error: Error) {
+        datasetEncoder?.addEvent("session_failed", detail: error.localizedDescription)
     }
 
     private func setViewProperties() {

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import UIKit
 import ARKit
 import CryptoKit
 import CoreMotion
@@ -24,10 +25,20 @@ class DatasetEncoder {
     private let odometryEncoder: OdometryEncoder
     private let imuEncoder: IMUEncoder
     private let distortionEncoder: DistortionEncoder
+    private let poseEncoder: PoseEncoder
+    private let clockEncoder: ClockEncoder
+    private let eventEncoder: EventEncoder
     private var lastFrame: ARFrame?
     private var dispatchGroup = DispatchGroup()
     private var currentFrame: Int = -1
     private var savedFrames: Int = 0
+    private var droppedFrames: Int = 0
+    private var finished: Bool = false
+    private var lastTrackingState: String = ""
+    private let videoWidth: CGFloat
+    private let videoHeight: CGFloat
+    private let startedUptime: TimeInterval
+    private let startedUnix: TimeInterval
     private let frameInterval: Int // Only save every frameInterval-th frame.
     private let encodingSemaphore = DispatchSemaphore(value: 3) // Limit queued frames to avoid ARFrame retention
     public let id: UUID
@@ -49,6 +60,10 @@ class DatasetEncoder {
         
         let width = arConfiguration.videoFormat.imageResolution.width
         let height = arConfiguration.videoFormat.imageResolution.height
+        self.videoWidth = width
+        self.videoHeight = height
+        self.startedUptime = ProcessInfo.processInfo.systemUptime
+        self.startedUnix = Date().timeIntervalSince1970
         var theId: UUID = UUID()
         datasetDirectory = DatasetEncoder.createDirectory(id: &theId)
         self.id = theId
@@ -64,9 +79,20 @@ class DatasetEncoder {
         self.imuPath = datasetDirectory.appendingPathComponent("imu.csv", isDirectory: false)
         self.imuEncoder = IMUEncoder(url: self.imuPath)
         self.distortionEncoder = DistortionEncoder(datasetDirectory: datasetDirectory)
+        self.poseEncoder = PoseEncoder(url: datasetDirectory.appendingPathComponent("poses.csv", isDirectory: false))
+        self.clockEncoder = ClockEncoder(url: datasetDirectory.appendingPathComponent("clock.csv", isDirectory: false))
+        self.eventEncoder = EventEncoder(url: datasetDirectory.appendingPathComponent("events.csv", isDirectory: false))
     }
 
     func add(frame: ARFrame) {
+        // Every frame's pose is kept, whether or not its images are saved below.
+        poseEncoder.add(frame: frame)
+        let (state, reason) = PoseEncoder.describe(frame.camera.trackingState)
+        let trackingState = reason.isEmpty ? state : "\(state)/\(reason)"
+        if trackingState != lastTrackingState {
+            eventEncoder.add(event: "tracking_state", detail: trackingState, timestamp: frame.timestamp)
+            lastTrackingState = trackingState
+        }
         let totalFrames: Int = currentFrame
         currentFrame = currentFrame + 1
         if (currentFrame % frameInterval != 0) {
@@ -74,6 +100,8 @@ class DatasetEncoder {
         }
         // Drop frame if encoding is backed up to avoid accumulating ARFrame references.
         guard encodingSemaphore.wait(timeout: .now()) == .success else {
+            droppedFrames = droppedFrames + 1
+            eventEncoder.add(event: "frame_dropped", detail: "encoder backed up", timestamp: frame.timestamp)
             return
         }
         let frameNumber: Int = savedFrames
@@ -134,29 +162,44 @@ class DatasetEncoder {
         latestGyroscopeData = nil
     }
 
-    func wrapUp() {
+    func addEvent(_ event: String, detail: String = "") {
+        // The AR session keeps running after recording stops; its files are closed by then.
+        guard !finished else { return }
+        eventEncoder.add(event: event, detail: detail)
+    }
+
+    // planes: the session's plane anchors when recording stops, written to planes.json.
+    func wrapUp(planes: [ARPlaneAnchor] = []) {
+        finished = true
         dispatchGroup.wait()
         self.rgbEncoder.finishEncoding()
         self.imuEncoder.done()
         self.odometryEncoder.done()
         self.distortionEncoder.done()
+        self.poseEncoder.done()
+        self.clockEncoder.done()
+        self.eventEncoder.add(event: "thermal_state", detail: EventEncoder.describe(ProcessInfo.processInfo.thermalState))
+        self.eventEncoder.done()
         writeIntrinsics()
+        writePlanes(planes)
+        writeMetadata()
         switch self.rgbEncoder.status {
             case .allGood:
                 status = .allGood
             case .error:
                 status = .videoEncodingError
         }
+        // Only errors from here on: an earlier video error must not be reset.
         switch self.depthEncoder.status {
             case .allGood:
-                status = .allGood
+                break
             case .frameEncodingError:
                 status = .videoEncodingError
                 print("Something went wrong encoding depth.")
         }
         switch self.confidenceEncoder.status {
             case .allGood:
-                status = .allGood
+                break
             case .encodingError:
                 status = .videoEncodingError
                 print("Something went wrong encoding confidence values.")
@@ -177,6 +220,90 @@ class DatasetEncoder {
             } catch let error {
                 print("Could not write camera matrix. \(error.localizedDescription)")
             }
+        }
+    }
+
+    private func writePlanes(_ planes: [ARPlaneAnchor]) {
+        let entries: [[String: Any]] = planes.map { (plane: ARPlaneAnchor) -> [String: Any] in
+            let m = plane.transform
+            let extent: [Float]
+            if #available(iOS 16.0, *) {
+                extent = [plane.planeExtent.width, plane.planeExtent.height]
+            } else {
+                extent = [plane.extent.x, plane.extent.z]
+            }
+            let columns = [m.columns.0, m.columns.1, m.columns.2, m.columns.3]
+            return [
+                "identifier": plane.identifier.uuidString,
+                "alignment": plane.alignment == .horizontal ? "horizontal" : "vertical",
+                "classification": DatasetEncoder.describe(plane.classification),
+                // Column-major 4x4 plane-to-world, in ARKit's world frame (y up).
+                "transform": columns.flatMap { [$0.x, $0.y, $0.z, $0.w] },
+                "center": [plane.center.x, plane.center.y, plane.center.z],
+                // Along the plane's x and z axes, in meters.
+                "extent": extent,
+            ]
+        }
+        writeJSON(["planes": entries], to: "planes.json")
+    }
+
+    private func writeMetadata() {
+        let info = Bundle.main.infoDictionary ?? [:]
+        var system = utsname()
+        uname(&system)
+        let machine = withUnsafeBytes(of: &system.machine) { bytes in
+            String(decoding: bytes.prefix(while: { $0 != 0 }), as: UTF8.self)
+        }
+        let metadata: [String: Any] = [
+            "app_version": info["CFBundleShortVersionString"] as? String ?? "",
+            "app_build": info["CFBundleVersion"] as? String ?? "",
+            "device_model": machine,
+            "system_version": UIDevice.current.systemVersion,
+            "video_width": Int(videoWidth),
+            "video_height": Int(videoHeight),
+            "fps_divider": frameInterval,
+            "ar_frames": currentFrame + 1,
+            "saved_frames": savedFrames,
+            "dropped_frames": droppedFrames,
+            "started_uptime": startedUptime,
+            "started_unix": startedUnix,
+            "timestamps": "seconds of systemUptime; clock.csv pairs uptime with unix time",
+            "pose_convention": "camera-to-world; camera x right, y down, z forward; world is ARKit's (y up, gravity aligned, origin where the AR session started)",
+            "imu_units": "acceleration in g, rotation rate in rad/s, device axes",
+        ]
+        writeJSON(metadata, to: "metadata.json")
+    }
+
+    private func writeJSON(_ object: [String: Any], to name: String) {
+        let url = datasetDirectory.appendingPathComponent(name, isDirectory: false)
+        do {
+            let data = try JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys])
+            try data.write(to: url)
+        } catch let error {
+            print("Could not write \(name). \(error.localizedDescription)")
+        }
+    }
+
+    static private func describe(_ classification: ARPlaneAnchor.Classification) -> String {
+        switch classification {
+            case .floor:
+                return "floor"
+            case .ceiling:
+                return "ceiling"
+            case .wall:
+                return "wall"
+            case .table:
+                return "table"
+            case .seat:
+                return "seat"
+            case .door:
+                return "door"
+            case .window:
+                return "window"
+            case .none(_):
+                return "none"
+            @unknown default:
+                return "unknown"
         }
     }
 

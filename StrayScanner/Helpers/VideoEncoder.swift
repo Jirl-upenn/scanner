@@ -56,6 +56,9 @@ class VideoEncoder {
     private func initializeFile() {
         do {
             videoWriter = try AVAssetWriter(outputURL: self.filePath, fileType: .mp4)
+            // Write a fragment every second, so the file stays readable up to the
+            // last fragment if the app is killed before finishWriting completes.
+            videoWriter!.movieFragmentInterval = CMTime(seconds: 1.0, preferredTimescale: 600)
             let settings: [String : Any] = [
                 AVVideoCodecKey: AVVideoCodecType.hevc,
                 AVVideoWidthKey: self.width,
@@ -93,13 +96,23 @@ class VideoEncoder {
             let error = videoWriter!.error
             print("Something went wrong when writing video. \(error!.localizedDescription)")
             self.status = .error
-        } else {
+        } else if let writer = videoWriter {
+            // Block until the file is finalized: returning earlier lets the caller
+            // release this encoder (and the writer) before the moov atom is written.
+            // The completion handler runs on a background queue, not this thread.
+            let finished = DispatchSemaphore(value: 0)
             videoWriterInput?.markAsFinished()
-            videoWriter?.finishWriting { [weak self] in
-                self?.videoWriter = nil
-                self?.videoWriterInput = nil
-                self?.videoAdapter = nil
+            writer.finishWriting {
+                finished.signal()
             }
+            finished.wait()
+            if writer.status != .completed {
+                print("Finishing video failed. \(writer.error?.localizedDescription ?? "unknown error")")
+                self.status = .error
+            }
+            videoWriter = nil
+            videoWriterInput = nil
+            videoAdapter = nil
         }
     }
 

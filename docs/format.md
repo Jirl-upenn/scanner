@@ -8,7 +8,12 @@ The collected datasets are each contained in a folder, named after a random hash
 ```
 camera_matrix.csv
 odometry.csv
+poses.csv
 imu.csv
+clock.csv
+events.csv
+planes.json
+metadata.json
 depth/
   - 000000.png
   - 000001.png
@@ -59,10 +64,36 @@ The `imu.csv` file contains timestamps, linear acceleration readings and angular
 | Field | <div style="width: 500px">Meaning</div> |
 |---|---|
 | timestamp | Timestamp in seconds |
-| a\_x | Acceleration in m/s^2 in x direction |
-| a\_y | Acceleration in m/s^2 in y direction |
-| a\_z | Acceleration in m/s^2 in z direction |
+| a\_x | Acceleration in g in x direction |
+| a\_y | Acceleration in g in y direction |
+| a\_z | Acceleration in g in z direction |
 | alpha\_x | Rotation in rad/s around the x-axis |
 | alpha\_y | Rotation in rad/s around the y-axis |
 | alpha\_z | Rotation in rad/s around the z-axis |
 
+All timestamps (in `odometry.csv`, `poses.csv`, `imu.csv` and `events.csv`) are in seconds since the phone booted (`ProcessInfo.systemUptime`, the clock of `ARFrame.timestamp` and Core Motion).
+
+The `poses.csv` file contains the camera pose of every frame ARKit delivered, including frames whose images were not saved (because of the fps setting, or because encoding fell behind). Poses use the same convention as `odometry.csv`. The fields are:
+
+| Field | <div style="width: 500px">Meaning</div> |
+|---|---|
+| timestamp | Timestamp in seconds |
+| x, y, z | Camera position in meters, as in `odometry.csv` |
+| qx, qy, qz, qw | Camera rotation quaternion, as in `odometry.csv` |
+| tracking\_state | `normal`, `limited` or `not_available` |
+| tracking\_reason | When limited: `initializing`, `relocalizing`, `excessive_motion` or `insufficient_features` |
+| world\_mapping\_status | `not_available`, `limited`, `extending` or `mapped` |
+
+The `clock.csv` file relates timestamps to wall clock time. Each row is a reading of the uptime clock and the Unix time clock taken back to back: one when recording starts, one per second while recording and one when it stops. Unix time of a timestamp `t` is `t + (unix - uptime)`; take the median over rows, or interpolate if the wall clock was corrected during the recording.
+
+| Field | <div style="width: 500px">Meaning</div> |
+|---|---|
+| uptime | Uptime in seconds |
+| unix | Unix time in seconds |
+| window | Uptime elapsed around the Unix time read, in seconds: a bound on the pairing error |
+
+The `events.csv` file lists things that explain gaps or bad stretches in a recording: `tracking_state` changes, `frame_dropped` (encoding fell behind, so the frame's images were not saved; its pose is still in `poses.csv`), `thermal_state` (at start, on change and at stop), `memory_warning`, `app_will_resign_active`, `session_interrupted`, `session_interruption_ended` and `session_failed`. The fields are `timestamp`, `event` and `detail`.
+
+The `planes.json` file contains the horizontal planes ARKit detected, as of the end of the recording. Each has a `classification` (`floor`, `table`, `seat`, ... or `none`), a column-major 4 x 4 `transform` from plane to world (ARKit's world frame), a `center` and an `extent` (meters along the plane's x and z axes), both in the plane's frame.
+
+The `metadata.json` file describes the recording: app version, device model, iOS version, video resolution, fps divider, frame counts (`ar_frames`, `saved_frames`, `dropped_frames`), the start time in both clocks, and the pose, timestamp and IMU conventions.
