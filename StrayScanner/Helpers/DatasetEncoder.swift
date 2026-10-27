@@ -39,6 +39,7 @@ class DatasetEncoder {
     private let videoHeight: CGFloat
     private let startedUptime: TimeInterval
     private let startedUnix: TimeInterval
+    private let wearerHeightCm: Double? // as set when recording started
     private let frameInterval: Int // Only save every frameInterval-th frame.
     private let encodingSemaphore = DispatchSemaphore(value: 3) // Limit queued frames to avoid ARFrame retention
     public let id: UUID
@@ -56,6 +57,7 @@ class DatasetEncoder {
 
     init(arConfiguration: ARWorldTrackingConfiguration, fpsDivider: Int = 1) {
         self.frameInterval = fpsDivider
+        self.wearerHeightCm = storedWearerHeightCm()
         self.queue = DispatchQueue(label: "encoderQueue")
         
         let width = arConfiguration.videoFormat.imageResolution.width
@@ -270,6 +272,7 @@ class DatasetEncoder {
             "timestamps": "seconds of systemUptime; clock.csv pairs uptime with unix time",
             "pose_convention": "camera-to-world; camera x right, y down, z forward; world is ARKit's (y up, gravity aligned, origin where the AR session started)",
             "imu_units": "acceleration in g, rotation rate in rad/s, device axes",
+            "wearer_height_m": wearerHeightCm.map { $0 / 100 } ?? NSNull(),
         ]
         writeJSON(metadata, to: "metadata.json")
     }

@@ -47,6 +47,8 @@ class SessionListViewModel: ObservableObject {
 struct SessionList: View {
     @ObservedObject var viewModel = SessionListViewModel()
     @State private var showingInfo = false
+    @State private var showingHeight = false
+    @AppStorage(WearerHeightUserDefaultsKey) private var wearerHeightCm: Double = 0
 
     var body: some View {
         ZStack {
@@ -93,17 +95,45 @@ struct SessionList: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 50.0)
                 }
+                // Recording needs the wearer's height (written to metadata.json).
+                let heightSet = WearerHeightRangeCm.contains(wearerHeightCm)
                 HStack {
                     Spacer()
-                    NavigationLink(destination: NewSessionView(), label: {
-                        Text("Record new session")
-                            .font(.title3)
-                            .padding(20)
-                            .background(Color("TextColor"))
-                            .foregroundColor(Color("LightColor"))
-                            .cornerRadius(35)
-                            .padding(20)
+                    Button(action: { showingHeight = true }, label: {
+                        Text(heightSet ? "Wearer height: \(formatWearerHeight(wearerHeightCm))  ·  Edit"
+                                       : "Set wearer height to record")
+                            .font(.body)
+                            .foregroundColor(Color("TextColor"))
                     })
+                    .padding(.top, 10)
+                    .sheet(isPresented: $showingHeight) {
+                        WearerHeightView()
+                    }
+                    Spacer()
+                }
+                HStack {
+                    Spacer()
+                    if heightSet {
+                        NavigationLink(destination: NewSessionView(), label: {
+                            Text("Record new session")
+                                .font(.title3)
+                                .padding(20)
+                                .background(Color("TextColor"))
+                                .foregroundColor(Color("LightColor"))
+                                .cornerRadius(35)
+                                .padding(20)
+                        })
+                    } else {
+                        Button(action: { showingHeight = true }, label: {
+                            Text("Record new session")
+                                .font(.title3)
+                                .padding(20)
+                                .background(Color("TextColor").opacity(0.4))
+                                .foregroundColor(Color("LightColor"))
+                                .cornerRadius(35)
+                                .padding(20)
+                        })
+                    }
                     Spacer()
                 }
                 if (viewModel.sessions.isEmpty) {

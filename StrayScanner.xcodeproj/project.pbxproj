@@ -22,6 +22,8 @@
 		385999C925616F3000F3F681 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 385999C825616F3000F3F681 /* Preview Assets.xcassets */; };
 		385999CC25616F3000F3F681 /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 385999CA25616F3000F3F681 /* LaunchScreen.storyboard */; };
 		3863FE5E25FCBB0E00C1DA4F /* InformationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 387B57C125EC065600132903 /* InformationView.swift */; };
+		E54EC3B630E616B3237C701E /* WearerHeight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81CB2AC8FF876CCCBEC2FA9E /* WearerHeight.swift */; };
+		4848771AC3A20BDF625E0C3A /* WearerHeight.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81CB2AC8FF876CCCBEC2FA9E /* WearerHeight.swift */; };
 		3863FE5F25FCBB0E00C1DA4F /* NewSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38E969CA2572608E00054CC4 /* NewSession.swift */; };
 		3863FE6225FCBB0E00C1DA4F /* RecordSessionViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38FB730E2572A9FA007D9CB0 /* RecordSessionViewController.swift */; };
 		3863FE6325FCBB0E00C1DA4F /* SessionRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38045D572561A7370004F23C /* SessionRow.swift */; };
@@ -124,6 +126,7 @@
 		387B578025EA5BB900132903 /* StrayScannerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StrayScannerTests.swift; sourceTree = "<group>"; };
 		387B578225EA5BB900132903 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		387B57C125EC065600132903 /* InformationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InformationView.swift; sourceTree = "<group>"; };
+		81CB2AC8FF876CCCBEC2FA9E /* WearerHeight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WearerHeight.swift; sourceTree = "<group>"; };
 		38ABA53C26D63239002169BD /* Info-debug.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "Info-debug.plist"; sourceTree = "<group>"; };
 		38C17B10259BE1DA006B3FDA /* Recording+CoreDataClass.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Recording+CoreDataClass.swift"; sourceTree = "<group>"; };
 		38C17B11259BE1DA006B3FDA /* Recording+CoreDataProperties.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Recording+CoreDataProperties.swift"; sourceTree = "<group>"; };
@@ -200,6 +203,7 @@
 				386E277725991163007D023B /* RecordButton.swift */,
 				38C17B22259D1C80006B3FDA /* SessionDetail.swift */,
 				387B57C125EC065600132903 /* InformationView.swift */,
+				81CB2AC8FF876CCCBEC2FA9E /* WearerHeight.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -514,6 +518,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				387B57C225EC065600132903 /* InformationView.swift in Sources */,
+				E54EC3B630E616B3237C701E /* WearerHeight.swift in Sources */,
 				38E969CB2572608E00054CC4 /* NewSession.swift in Sources */,
 				3807420F27BBCF2D003194C1 /* lodepng.cpp in Sources */,
 				38FB730F2572A9FA007D9CB0 /* RecordSessionViewController.swift in Sources */,
@@ -549,6 +554,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				3863FE5E25FCBB0E00C1DA4F /* InformationView.swift in Sources */,
+				4848771AC3A20BDF625E0C3A /* WearerHeight.swift in Sources */,
 				3863FE5F25FCBB0E00C1DA4F /* NewSession.swift in Sources */,
 				3807421127BBD77B003194C1 /* lodepng.cpp in Sources */,
 				3863FE6225FCBB0E00C1DA4F /* RecordSessionViewController.swift in Sources */,

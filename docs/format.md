@@ -96,4 +96,4 @@ The `events.csv` file lists things that explain gaps or bad stretches in a recor
 
 The `planes.json` file contains the horizontal planes ARKit detected, as of the end of the recording. Each has a `classification` (`floor`, `table`, `seat`, ... or `none`), a column-major 4 x 4 `transform` from plane to world (ARKit's world frame), a `center` and an `extent` (meters along the plane's x and z axes), both in the plane's frame.
 
-The `metadata.json` file describes the recording: app version, device model, iOS version, video resolution, fps divider, frame counts (`ar_frames`, `saved_frames`, `dropped_frames`), the start time in both clocks, and the pose, timestamp and IMU conventions.
+The `metadata.json` file describes the recording: app version, device model, iOS version, video resolution, fps divider, frame counts (`ar_frames`, `saved_frames`, `dropped_frames`), the start time in both clocks, the pose, timestamp and IMU conventions, and `wearer_height_m`: the wearer's standing height in meters as entered in the app (null if none was set).
