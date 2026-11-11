@@ -9,6 +9,7 @@ The collected datasets are each contained in a folder, named after a random hash
 camera_matrix.csv
 odometry.csv
 poses.csv
+face.csv
 imu.csv
 clock.csv
 events.csv
@@ -71,7 +72,7 @@ The `imu.csv` file contains timestamps, linear acceleration readings and angular
 | alpha\_y | Rotation in rad/s around the y-axis |
 | alpha\_z | Rotation in rad/s around the z-axis |
 
-All timestamps (in `odometry.csv`, `poses.csv`, `imu.csv` and `events.csv`) are in seconds since the phone booted (`ProcessInfo.systemUptime`, the clock of `ARFrame.timestamp` and Core Motion).
+All timestamps (in `odometry.csv`, `poses.csv`, `face.csv`, `imu.csv` and `events.csv`) are in seconds since the phone booted (`ProcessInfo.systemUptime`, the clock of `ARFrame.timestamp` and Core Motion).
 
 The `poses.csv` file contains the camera pose of every frame ARKit delivered, including frames whose images were not saved (because of the fps setting, or because encoding fell behind). Poses use the same convention as `odometry.csv`. The fields are:
 
@@ -84,6 +85,19 @@ The `poses.csv` file contains the camera pose of every frame ARKit delivered, in
 | tracking\_reason | When limited: `initializing`, `relocalizing`, `excessive_motion` or `insufficient_features` |
 | world\_mapping\_status | `not_available`, `limited`, `extending` or `mapped` |
 
+The `face.csv` file contains the pose of the wearer's face as seen by the front camera, one row for every frame ARKit delivered (the same rows as `poses.csv`). It is written on devices that can track a face with the front camera while tracking the room with the rear one; `face_tracking` in `metadata.json` says whether it was. It is used to find where the eyes are relative to a head-mounted phone: the wearer looks at the phone, then lifts it into the mount. No image, mesh or expression data is saved.
+
+The face pose is ARKit's face anchor, unmodified: face-to-world in ARKit's world frame, with the face's x axis toward its own left, y up and z out of the face. Unlike the camera pose in `poses.csv`, its axes are not flipped.
+
+| Field | <div style="width: 500px">Meaning</div> |
+|---|---|
+| timestamp | Timestamp in seconds |
+| is\_tracked | 1 if ARKit is tracking the face in this frame, otherwise 0. The remaining fields are empty when ARKit has no face anchor, and hold the last known pose when it has one that is not tracked |
+| x, y, z | Face position in meters, in the world frame |
+| qx, qy, qz, qw | Face rotation quaternion, face-to-world |
+| left\_eye\_x ... left\_eye\_qw | Left eye position and rotation quaternion, in the face frame |
+| right\_eye\_x ... right\_eye\_qw | Right eye position and rotation quaternion, in the face frame |
+
 The `clock.csv` file relates timestamps to wall clock time. Each row is a reading of the uptime clock and the Unix time clock taken back to back: one when recording starts, one per second while recording and one when it stops. Unix time of a timestamp `t` is `t + (unix - uptime)`; take the median over rows, or interpolate if the wall clock was corrected during the recording.
 
 | Field | <div style="width: 500px">Meaning</div> |
@@ -92,8 +106,8 @@ The `clock.csv` file relates timestamps to wall clock time. Each row is a readin
 | unix | Unix time in seconds |
 | window | Uptime elapsed around the Unix time read, in seconds: a bound on the pairing error |
 
-The `events.csv` file lists things that explain gaps or bad stretches in a recording: `tracking_state` changes, `frame_dropped` (encoding fell behind, so the frame's images were not saved; its pose is still in `poses.csv`), `thermal_state` (at start, on change and at stop), `memory_warning`, `app_will_resign_active`, `session_interrupted`, `session_interruption_ended` and `session_failed`. The fields are `timestamp`, `event` and `detail`.
+The `events.csv` file lists things that explain gaps or bad stretches in a recording: `tracking_state` changes, `frame_dropped` (encoding fell behind, so the frame's images were not saved; its pose is still in `poses.csv`), `thermal_state` (at start, on change and at stop), `memory_warning`, `app_will_resign_active`, `session_interrupted`, `session_interruption_ended` and `session_failed`. With face tracking on it also has `face_tracking_started` and `face_tracking_lost`, and the two cues the app gives during a face scan: `face_steady_cue` (the face has been held still in front of the phone; the wearer is told to lift it into the mount) and `seated_cue` (the phone has come to rest away from the face). The fields are `timestamp`, `event` and `detail`.
 
 The `planes.json` file contains the horizontal planes ARKit detected, as of the end of the recording. Each has a `classification` (`floor`, `table`, `seat`, ... or `none`), a column-major 4 x 4 `transform` from plane to world (ARKit's world frame), a `center` and an `extent` (meters along the plane's x and z axes), both in the plane's frame.
 
-The `metadata.json` file describes the recording: app version, device model, iOS version, video resolution, fps divider, frame counts (`ar_frames`, `saved_frames`, `dropped_frames`), the start time in both clocks, the pose, timestamp and IMU conventions, and `wearer_height_m`: the wearer's standing height in meters as entered in the app (null if none was set).
+The `metadata.json` file describes the recording: app version, device model, iOS version, video resolution, fps divider, frame counts (`ar_frames`, `saved_frames`, `dropped_frames`), the start time in both clocks, the pose, timestamp and IMU conventions, and `wearer_height_m`: the wearer's standing height in meters as entered in the app (null if none was set). `scene_depth` is false on devices without LiDAR, where `depth/` and `confidence/` are empty; `depth_frames` counts the depth frames saved. `face_tracking` says whether `face.csv` was written, `face_convention` states its axes, and `face_cue_thresholds` lists the limits the app used for the two face scan cues.

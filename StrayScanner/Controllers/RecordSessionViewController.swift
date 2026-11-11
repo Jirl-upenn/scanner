@@ -12,6 +12,7 @@ import Metal
 import ARKit
 import CoreData
 import CoreMotion
+import AudioToolbox
 
 let FpsDividers: [Int] = [1, 2, 4, 12, 60]
 let AvailableFpsSettings: [Int] = FpsDividers.map { Int(60 / $0) }
@@ -40,6 +41,12 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
     private var datasetEncoder: DatasetEncoder?
     private let imuOperationQueue = OperationQueue()
     private var chosenFpsSetting: Int = 0
+    private var hasSceneDepth: Bool = false
+    private var faceTrackingEnabled: Bool = false
+    private var faceCue = FaceScanCue()
+    private let faceLabel = UILabel()
+    private let faceLabelBackground = UIView()
+    private let cueHaptics = UINotificationFeedbackGenerator()
     @IBOutlet private var rgbView: MetalView!
     @IBOutlet private var depthView: MetalView!
     @IBOutlet private var recordButton: RecordButton!
@@ -64,6 +71,7 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
         rgbView.addGestureRecognizer(UITapGestureRecognizer(target: self, action: #selector(viewTapped)))
         
         setViewProperties()
+        addFaceLabel()
         session.delegate = self
 
         recordButton.setCallback { (recording: Bool) in
@@ -94,15 +102,32 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
     private func startSession() {
         let config = ARWorldTrackingConfiguration()
         arConfiguration = config
-        if !ARWorldTrackingConfiguration.isSupported || !ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth) {
+        if !ARWorldTrackingConfiguration.isSupported {
             print("AR is not supported.")
             unsupported = true
-        } else {
-            config.frameSemantics.insert(.sceneDepth)
-            // Plane anchors (with floor classification) are saved to planes.json.
-            config.planeDetection = .horizontal
-            session.run(config)
+            return
         }
+        // Depth needs LiDAR. Without it the recording has no depth/ or confidence/ frames.
+        hasSceneDepth = ARWorldTrackingConfiguration.supportsFrameSemantics(.sceneDepth)
+        if hasSceneDepth {
+            config.frameSemantics.insert(.sceneDepth)
+        } else {
+            showRgbPreview()
+        }
+        // Plane anchors (with floor classification) are saved to planes.json.
+        config.planeDetection = .horizontal
+        // The front camera tracks the wearer's face while the rear camera tracks the
+        // room, in the same world frame (face.csv).
+        faceTrackingEnabled = ARWorldTrackingConfiguration.supportsUserFaceTracking
+        config.userFaceTrackingEnabled = faceTrackingEnabled
+        faceLabelBackground.isHidden = !faceTrackingEnabled
+        session.run(config)
+    }
+
+    private func showRgbPreview() {
+        renderer?.renderMode = RenderMode.rgb
+        rgbView.isHidden = false
+        depthView.isHidden = true
     }
     
     private func startRawIMU() {
@@ -169,6 +194,8 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
             self.updateTime()
         }
         datasetEncoder = DatasetEncoder(arConfiguration: arConfiguration!, fpsDivider: FpsDividers[chosenFpsSetting])
+        faceCue.reset()
+        cueHaptics.prepare()
         startRawIMU()
     }
 
@@ -240,6 +267,7 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
     }
 
     @objc func viewTapped() {
+        if !hasSceneDepth { return } // nothing to show in the depth view
         switch renderer!.renderMode {
             case .depth:
                 renderer!.renderMode = RenderMode.rgb
@@ -260,13 +288,83 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
 
     func session(_ session: ARSession, didUpdate frame: ARFrame) {
         self.renderer!.render(frame: frame)
+        let face = faceTrackingEnabled ? FaceEncoder.faceAnchor(in: frame) : nil
+        let faceTracked = face?.isTracked ?? false
+        var cue: FaceScanCue.Cue? = nil
         if startedRecording != nil {
             if let encoder = datasetEncoder {
-                encoder.add(frame: frame)
+                encoder.add(frame: frame, face: face)
+                if faceTrackingEnabled {
+                    cue = faceCue.update(time: frame.timestamp, camera: frame.camera.transform, face: faceTracked ? face?.transform : nil)
+                    if let cue = cue {
+                        give(cue: cue, encoder: encoder, timestamp: frame.timestamp)
+                    }
+                }
             } else {
                 print("There is no video encoder. That can't be good.")
             }
         }
+        if faceTrackingEnabled {
+            updateFaceLabel(faceTracked: faceTracked)
+        }
+    }
+
+    // A sound and a haptic: the wearer cannot see the screen once the phone is on
+    // their head. The sound follows the ring/silent switch; the haptic does not.
+    private func give(cue: FaceScanCue.Cue, encoder: DatasetEncoder, timestamp: TimeInterval) {
+        switch cue {
+            case .faceSteady:
+                encoder.addEvent("face_steady_cue", timestamp: timestamp)
+                AudioServicesPlaySystemSound(1113)
+            case .seated:
+                encoder.addEvent("seated_cue", timestamp: timestamp)
+                AudioServicesPlaySystemSound(1114)
+        }
+        cueHaptics.notificationOccurred(.success)
+        cueHaptics.prepare()
+    }
+
+    private func updateFaceLabel(faceTracked: Bool) {
+        let text: String
+        if startedRecording == nil {
+            text = faceTracked ? "Face found" : "Looking for your face…"
+        } else if faceCue.phase == .awaitingSeat {
+            text = faceCue.seatedCount == 0
+                ? "Keep your head still and lift the phone into the mount"
+                : "Face scanned. Tap stop."
+        } else if faceTracked {
+            text = "Hold still…"
+        } else {
+            text = faceCue.seatedCount == 0 ? "Looking for your face…" : "Phone seated"
+        }
+        if faceLabel.text != text {
+            faceLabel.text = text
+        }
+    }
+
+    // Over the bottom of the camera preview.
+    private func addFaceLabel() {
+        faceLabelBackground.translatesAutoresizingMaskIntoConstraints = false
+        faceLabelBackground.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        faceLabelBackground.layer.cornerRadius = 12.0
+        faceLabelBackground.isUserInteractionEnabled = false
+        faceLabelBackground.isHidden = true
+        faceLabel.translatesAutoresizingMaskIntoConstraints = false
+        faceLabel.textColor = UIColor.white
+        faceLabel.font = UIFont.preferredFont(forTextStyle: .headline)
+        faceLabel.textAlignment = .center
+        faceLabel.numberOfLines = 0
+        faceLabelBackground.addSubview(faceLabel)
+        view.addSubview(faceLabelBackground)
+        NSLayoutConstraint.activate([
+            faceLabel.topAnchor.constraint(equalTo: faceLabelBackground.topAnchor, constant: 8),
+            faceLabel.bottomAnchor.constraint(equalTo: faceLabelBackground.bottomAnchor, constant: -8),
+            faceLabel.leadingAnchor.constraint(equalTo: faceLabelBackground.leadingAnchor, constant: 14),
+            faceLabel.trailingAnchor.constraint(equalTo: faceLabelBackground.trailingAnchor, constant: -14),
+            faceLabelBackground.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            faceLabelBackground.bottomAnchor.constraint(equalTo: depthView.bottomAnchor, constant: -12),
+            faceLabelBackground.widthAnchor.constraint(lessThanOrEqualTo: view.widthAnchor, constant: -32),
+        ])
     }
 
     func sessionWasInterrupted(_ session: ARSession) {
@@ -279,6 +377,13 @@ class RecordSessionViewController : UIViewController, ARSessionDelegate {
 
     func session(_ session: ARSession, didFailWithError error: Error) {
         datasetEncoder?.addEvent("session_failed", detail: error.localizedDescription)
+        // If the device cannot run face tracking alongside the rest, carry on without it.
+        if faceTrackingEnabled, startedRecording == nil, let config = arConfiguration {
+            faceTrackingEnabled = false
+            faceLabelBackground.isHidden = true
+            config.userFaceTrackingEnabled = false
+            session.run(config)
+        }
     }
 
     private func setViewProperties() {

@@ -26,6 +26,7 @@ class DatasetEncoder {
     private let imuEncoder: IMUEncoder
     private let distortionEncoder: DistortionEncoder
     private let poseEncoder: PoseEncoder
+    private let faceEncoder: FaceEncoder? // nil when face tracking is off
     private let clockEncoder: ClockEncoder
     private let eventEncoder: EventEncoder
     private var lastFrame: ARFrame?
@@ -35,6 +36,9 @@ class DatasetEncoder {
     private var droppedFrames: Int = 0
     private var finished: Bool = false
     private var lastTrackingState: String = ""
+    private var faceTracked: Bool = false
+    private var depthFrames: Int = 0
+    private let sceneDepthEnabled: Bool
     private let videoWidth: CGFloat
     private let videoHeight: CGFloat
     private let startedUptime: TimeInterval
@@ -57,6 +61,7 @@ class DatasetEncoder {
 
     init(arConfiguration: ARWorldTrackingConfiguration, fpsDivider: Int = 1) {
         self.frameInterval = fpsDivider
+        self.sceneDepthEnabled = arConfiguration.frameSemantics.contains(.sceneDepth)
         self.wearerHeightCm = storedWearerHeightCm()
         self.queue = DispatchQueue(label: "encoderQueue")
         
@@ -82,13 +87,25 @@ class DatasetEncoder {
         self.imuEncoder = IMUEncoder(url: self.imuPath)
         self.distortionEncoder = DistortionEncoder(datasetDirectory: datasetDirectory)
         self.poseEncoder = PoseEncoder(url: datasetDirectory.appendingPathComponent("poses.csv", isDirectory: false))
+        self.faceEncoder = arConfiguration.userFaceTrackingEnabled
+            ? FaceEncoder(url: datasetDirectory.appendingPathComponent("face.csv", isDirectory: false))
+            : nil
         self.clockEncoder = ClockEncoder(url: datasetDirectory.appendingPathComponent("clock.csv", isDirectory: false))
         self.eventEncoder = EventEncoder(url: datasetDirectory.appendingPathComponent("events.csv", isDirectory: false))
     }
 
-    func add(frame: ARFrame) {
+    // face: the frame's face anchor, if face tracking is on and ARKit has one.
+    func add(frame: ARFrame, face: ARFaceAnchor? = nil) {
         // Every frame's pose is kept, whether or not its images are saved below.
         poseEncoder.add(frame: frame)
+        if let faceEncoder = faceEncoder {
+            faceEncoder.add(frame: frame, face: face)
+            let tracked = face?.isTracked ?? false
+            if tracked != faceTracked {
+                eventEncoder.add(event: tracked ? "face_tracking_started" : "face_tracking_lost", timestamp: frame.timestamp)
+                faceTracked = tracked
+            }
+        }
         let (state, reason) = PoseEncoder.describe(frame.camera.trackingState)
         let trackingState = reason.isEmpty ? state : "\(state)/\(reason)"
         if trackingState != lastTrackingState {
@@ -116,12 +133,13 @@ class DatasetEncoder {
             }
             if let sceneDepth = frame.sceneDepth {
                 self.depthEncoder.encodeFrame(frame: sceneDepth.depthMap, frameNumber: frameNumber)
+                self.depthFrames = self.depthFrames + 1
                 if let confidence = sceneDepth.confidenceMap {
                     self.confidenceEncoder.encodeFrame(frame: confidence, frameNumber: frameNumber)
                 } else {
                     print("warning: confidence map missing.")
                 }
-            } else {
+            } else if self.sceneDepthEnabled {
                 print("warning: scene depth missing.")
             }
             self.rgbEncoder.add(frame: VideoEncoderInput(buffer: frame.capturedImage, time: frame.timestamp), currentFrame: totalFrames)
@@ -164,10 +182,11 @@ class DatasetEncoder {
         latestGyroscopeData = nil
     }
 
-    func addEvent(_ event: String, detail: String = "") {
+    // timestamp: an ARFrame's, for events tied to a frame; otherwise now.
+    func addEvent(_ event: String, detail: String = "", timestamp: TimeInterval? = nil) {
         // The AR session keeps running after recording stops; its files are closed by then.
         guard !finished else { return }
-        eventEncoder.add(event: event, detail: detail)
+        eventEncoder.add(event: event, detail: detail, timestamp: timestamp ?? ProcessInfo.processInfo.systemUptime)
     }
 
     // planes: the session's plane anchors when recording stops, written to planes.json.
@@ -179,6 +198,7 @@ class DatasetEncoder {
         self.odometryEncoder.done()
         self.distortionEncoder.done()
         self.poseEncoder.done()
+        self.faceEncoder?.done()
         self.clockEncoder.done()
         self.eventEncoder.add(event: "thermal_state", detail: EventEncoder.describe(ProcessInfo.processInfo.thermalState))
         self.eventEncoder.done()
@@ -273,6 +293,12 @@ class DatasetEncoder {
             "pose_convention": "camera-to-world; camera x right, y down, z forward; world is ARKit's (y up, gravity aligned, origin where the AR session started)",
             "imu_units": "acceleration in g, rotation rate in rad/s, device axes",
             "wearer_height_m": wearerHeightCm.map { $0 / 100 } ?? NSNull(),
+            // false on devices without LiDAR: depth/ and confidence/ are then empty.
+            "scene_depth": sceneDepthEnabled,
+            "depth_frames": depthFrames,
+            "face_tracking": faceEncoder != nil,
+            "face_convention": "face.csv: face-to-world as ARKit gives it (not flipped like the camera pose); face x toward its own left, y up, z out of the face; eye poses are eye-to-face",
+            "face_cue_thresholds": FaceScanCue.thresholds,
         ]
         writeJSON(metadata, to: "metadata.json")
     }
