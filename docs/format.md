@@ -87,16 +87,17 @@ The `poses.csv` file contains the camera pose of every frame ARKit delivered, in
 
 The `face.csv` file contains the pose of the wearer's face as seen by the front camera, one row for every frame ARKit delivered (the same rows as `poses.csv`). It is written on devices that can track a face with the front camera while tracking the room with the rear one; `face_tracking` in `metadata.json` says whether it was. It is used to find where the eyes are relative to a head-mounted phone: the wearer looks at the phone, then lifts it into the mount. No image, mesh or expression data is saved.
 
-The face pose is ARKit's face anchor, unmodified: face-to-world in ARKit's world frame, with the face's x axis toward its own left, y up and z out of the face. Unlike the camera pose in `poses.csv`, its axes are not flipped.
+The face pose is ARKit's face anchor, unmodified: face-to-world in ARKit's world frame, written as ARKit reports it. Measured against Aria glasses on recordings from this app, the face's x axis points toward its own right, y up and z into the head (not the x-left, z-out frame Apple documents for face tracking on its own). Unlike the camera pose in `poses.csv`, its axes are not flipped.
 
 | Field | <div style="width: 500px">Meaning</div> |
 |---|---|
 | timestamp | Timestamp in seconds |
 | is\_tracked | 1 if ARKit is tracking the face in this frame, otherwise 0. The remaining fields are empty when ARKit has no face anchor, and hold the last known pose when it has one that is not tracked |
 | x, y, z | Face position in meters, in the world frame |
-| qx, qy, qz, qw | Face rotation quaternion, face-to-world |
+| qx, qy, qz, qw | Not usable for the face: ARKit's face axes are mirrored here (determinant -1), which a quaternion cannot represent. Kept for old readers; use r00 ... r22 |
 | left\_eye\_x ... left\_eye\_qw | Left eye position and rotation quaternion, in the face frame |
 | right\_eye\_x ... right\_eye\_qw | Right eye position and rotation quaternion, in the face frame |
+| r00 ... r22 | The face-to-world 3x3 orientation matrix as ARKit reports it, row by row. Recordings made before these columns existed have no usable face pitch or yaw |
 
 The `clock.csv` file relates timestamps to wall clock time. Each row is a reading of the uptime clock and the Unix time clock taken back to back: one when recording starts, one per second while recording and one when it stops. Unix time of a timestamp `t` is `t + (unix - uptime)`; take the median over rows, or interpolate if the wall clock was corrected during the recording.
 

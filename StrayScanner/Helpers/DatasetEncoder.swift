@@ -297,7 +297,7 @@ class DatasetEncoder {
             "scene_depth": sceneDepthEnabled,
             "depth_frames": depthFrames,
             "face_tracking": faceEncoder != nil,
-            "face_convention": "face.csv: face-to-world as ARKit gives it (not flipped like the camera pose); face x toward its own left, y up, z out of the face; eye poses are eye-to-face",
+            "face_convention": "face.csv: face-to-world as ARKit gives it (not flipped like the camera pose); measured: face x toward its own right, y up, z into the head; eye poses are eye-to-face",
             "face_cue_thresholds": FaceScanCue.thresholds,
         ]
         writeJSON(metadata, to: "metadata.json")
